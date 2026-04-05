@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+
+slampex_data_snapshot_tape.tsv.zip
+
+objective_answers.md
+submission_memo.md
