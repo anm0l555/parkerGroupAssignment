@@ -119,8 +119,8 @@ These were chosen intentionally by column type:
 The only charts that still use counts are the status trend, activation trend, mix charts, and risk rating composition chart.
 
 Important note:
-- The dashboard charts now use raw data averages so the chart values reconcile to a standard Excel pivot average on the same filtered rows.
-- Winsorization is still used inside the risk scoring engine, but not in the display charts.
+- The dashboard charts now use winsorized values for portfolio views, so display values will intentionally differ from a raw Excel pivot average on the same rows.
+- Raw monthly records are still shown in the drilldown table for auditability.
 
 ## Row-Level Traceability
 Every major chart now includes an expander labeled `View rows behind ...`.

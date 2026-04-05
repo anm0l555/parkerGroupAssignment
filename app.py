@@ -50,31 +50,31 @@ CHART_NOTES = {
     "status_trend": "This view counts customer-month rows, because status is a portfolio volume measure rather than a financial amount.",
     "activations": "This view counts unique customers by first observed active month, which is the right measure for conversion timing.",
     "ratio": {
-        "portfolio": "Portfolio ratio views use the monthly average so the chart reflects the average visible customer in each month.",
+        "portfolio": "Portfolio ratio views use the winsorized monthly average so extreme outliers do not dominate the displayed trend.",
         "customer": "Customer view shows the raw monthly current and quick ratios for the selected company.",
     },
     "limit_balance": {
-        "portfolio": "Credit limit and balance use monthly averages so the chart shows average exposure and average utilization load per visible row.",
+        "portfolio": "Credit limit and balance use winsorized monthly averages so the displayed line reflects stabilized exposure per visible row.",
         "customer": "Customer view shows the raw monthly credit limit and balance for the selected company.",
     },
     "cash_revenue": {
-        "portfolio": "Cash and revenue use monthly averages. These fields already represent company-level average style measures, so averaging them across visible rows creates an intuitive portfolio trend.",
+        "portfolio": "Cash and revenue use winsorized monthly averages so very large or unusual companies do not overwhelm the portfolio view.",
         "customer": "Customer view shows the raw monthly cash average and trailing-three-month revenue.",
     },
     "margin": {
-        "portfolio": "Margin charts use the monthly average so the line represents the average visible customer's profitability profile in each month.",
+        "portfolio": "Margin charts use winsorized monthly averages so one extreme positive or negative margin does not distort the displayed portfolio trend.",
         "customer": "Customer view shows the raw monthly gross, operating, and net margins.",
     },
     "reward": {
-        "portfolio": "Reward points use monthly averages so the chart reflects average reward activity per visible row rather than total program size.",
+        "portfolio": "Reward points use winsorized monthly averages so displayed reward activity is less sensitive to unusual spikes or data anomalies.",
         "customer": "Customer view shows the raw monthly reward points earned by the selected company.",
     },
     "delinquency": {
-        "portfolio": "Delinquent balance and DQ days use monthly averages among the visible delinquent rows, so the chart reflects average delinquency size and average severity.",
+        "portfolio": "Delinquent balance and DQ days use winsorized monthly averages among delinquent rows so the displayed severity is stabilized for outlier cases.",
         "customer": "Customer view shows the raw monthly delinquent balance and DQ days for the selected company.",
     },
     "mix": "Mix charts use the latest visible customer snapshot, so each customer contributes once to the segment count.",
-    "profitability": "Observed and risk-adjusted contribution are averaged by industry so the chart compares average customer economics by segment rather than total segment size.",
+    "profitability": "Observed and risk-adjusted contribution are winsorized before averaging by industry so the displayed economics are not dominated by a few extreme cases.",
     "rating_trend": "Risk rating trend counts unique customers by month and rating band, which is the correct unit for portfolio composition over time.",
 }
 
@@ -202,7 +202,7 @@ def build_monthly_series(
     column: str,
     single_customer_view: bool,
     aggregate: str,
-    prefer_winsorized: bool = False,
+    prefer_winsorized: bool = True,
 ) -> pd.Series:
     value_column = column
     winsorized_column = f"{column}_win"
@@ -377,7 +377,7 @@ def build_margin_chart(frame: pd.DataFrame, single_customer_view: bool) -> go.Fi
 
 
 def build_reward_chart(frame: pd.DataFrame, single_customer_view: bool, split_dimension: str) -> go.Figure:
-    chart_column = "rewardpoints"
+    chart_column = "rewardpoints" if single_customer_view else "rewardpoints_win"
     title = (
         "Reward Points Over Time (Customer Monthly Values)"
         if single_customer_view
@@ -522,16 +522,16 @@ def build_profitability_chart(frame: pd.DataFrame) -> go.Figure:
     latest_frame = latest_customer_snapshot(frame)
     segment_df = (
         latest_frame.groupby("industry_clean")[
-            ["observed_net_contribution", "risk_adjusted_contribution"]
+            ["observed_net_contribution_win", "risk_adjusted_contribution_win"]
         ]
         .mean()
         .reset_index()
-        .sort_values("risk_adjusted_contribution", ascending=False)
+        .sort_values("risk_adjusted_contribution_win", ascending=False)
         .head(10)
     )
     melted = segment_df.melt(
         id_vars="industry_clean",
-        value_vars=["observed_net_contribution", "risk_adjusted_contribution"],
+        value_vars=["observed_net_contribution_win", "risk_adjusted_contribution_win"],
         var_name="metric",
         value_name="amount",
     )
@@ -543,8 +543,8 @@ def build_profitability_chart(frame: pd.DataFrame) -> go.Figure:
         barmode="group",
         labels={"industry_clean": "Industry", "amount": "Contribution"},
         color_discrete_map={
-            "observed_net_contribution": ACCENT_COLORS["secondary"],
-            "risk_adjusted_contribution": ACCENT_COLORS["success"],
+            "observed_net_contribution_win": ACCENT_COLORS["secondary"],
+            "risk_adjusted_contribution_win": ACCENT_COLORS["success"],
         },
     )
     return format_figure(fig, "Observed vs Risk-Adjusted Contribution by Industry (Average per Customer)")
@@ -579,15 +579,17 @@ def build_customer_summary(frame: pd.DataFrame) -> pd.DataFrame:
             "risk_rating",
             "policy_action",
             "recommended_limit",
-            "utilization_pct",
+            "utilization_pct_win",
             "delinquency_bucket",
-            "risk_adjusted_contribution",
+            "risk_adjusted_contribution_win",
         ]
     ].rename(
         columns={
             "industry_clean": "industry",
             "region_bucket": "region",
             "is_active": "active",
+            "utilization_pct_win": "utilization_pct",
+            "risk_adjusted_contribution_win": "risk_adjusted_contribution",
         }
     )
     return summary.sort_values(["risk_score", "recommended_limit"], ascending=[False, False])
@@ -601,9 +603,9 @@ def build_segment_summary(frame: pd.DataFrame) -> pd.DataFrame:
             customers=("customer_id", "nunique"),
             active_share=("is_active", "mean"),
             avg_risk_score=("risk_score", "mean"),
-            observed_net_contribution=("observed_net_contribution", "sum"),
-            risk_adjusted_contribution=("risk_adjusted_contribution", "sum"),
-            delinquent_balance=("delinquent_balance", "sum"),
+            observed_net_contribution=("observed_net_contribution_win", "sum"),
+            risk_adjusted_contribution=("risk_adjusted_contribution_win", "sum"),
+            delinquent_balance=("delinquent_balance_win", "sum"),
         )
         .reset_index()
         .sort_values("risk_adjusted_contribution", ascending=False)
@@ -722,8 +724,8 @@ def render_kpis(frame: pd.DataFrame) -> None:
     unique_customers = latest_frame["customer_id"].nunique()
     active_share = latest_frame["is_active"].mean() if not latest_frame.empty else 0.0
     avg_risk_score = latest_frame["risk_score"].mean()
-    observed_contribution = frame["observed_net_contribution"].sum()
-    risk_adjusted_contribution = frame["risk_adjusted_contribution"].sum()
+    observed_contribution = frame["observed_net_contribution_win"].sum()
+    risk_adjusted_contribution = frame["risk_adjusted_contribution_win"].sum()
 
     kpi_cols = st.columns(5)
     metrics = [
@@ -967,9 +969,9 @@ def main() -> None:
         """
         <div class="methodology-note">
         The dashboard now adapts cleanly to light and dark mode, uses explicit aggregation rules by metric type,
-        uses raw data averages for portfolio charts except count-based composition views, keeps winsorization inside
-        the score engine rather than the display charts, and includes row-level explorers below charts so every
-        visible segment can be traced back to the contributing records.
+        uses winsorized values for portfolio charts and summary economics except count-based composition views, keeps
+        the raw monthly record table for auditability, and includes row-level explorers below charts so every visible
+        segment can be traced back to the contributing records.
         </div>
         """,
         unsafe_allow_html=True,

@@ -45,7 +45,7 @@ The dashboard includes:
 - Average delinquent balance and average DQ day trend among delinquent rows
 - Sortable customer and segment tables
 
-For portfolio charting, I use raw data averages for financial and exposure measures and counts for composition views. This is a presentation choice intended to show the average visible customer or average visible row in each month while still reconciling directly to an Excel pivot average on the same filtered data. Customer drilldown views continue to show raw monthly values.
+For portfolio charting, I use winsorized averages for financial and exposure measures and counts for composition views. This is a presentation choice intended to reduce the impact of extreme outliers in the displayed trends while still leaving the raw monthly records available in drilldown. Customer drilldown views continue to show raw monthly values.
 
 ## Objective 2: Risk Rating System And Credit Policy
 I implemented two scorecards so the methodology matches the dataset:
@@ -143,7 +143,7 @@ In the industry comparison chart, these are shown as average customer economics 
 
 ## Key Assumptions
 - Missing delinquency fields are treated as no observed delinquency only for aggregate profitability logic.
-- Winsorization at the 1st and 99th percentiles is used to reduce distortion inside the score construction logic, but not in the display charts.
+- Winsorization at the 1st and 99th percentiles is used to reduce distortion inside the score construction logic and the portfolio display charts.
 - Portfolio charts use averages for financial and exposure measures, while composition charts use customer counts.
 - Reward points are valued at `$0.01` each, per the assignment.
 - Delinquent balance is treated as exposed balance rather than a confirmed write-off, so expected loss is estimated through delinquency haircuts.

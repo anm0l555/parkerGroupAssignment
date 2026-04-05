@@ -44,6 +44,11 @@ WINSORIZED_COLUMNS = [
     "delinquent_balance",
     "dq_days",
     "utilization_pct",
+    "interchange_revenue",
+    "rewards_cost",
+    "observed_net_contribution",
+    "stress_expected_loss",
+    "risk_adjusted_contribution",
 ]
 APPLICANT_WEIGHTS = {
     "cash_avg_score": 25,
