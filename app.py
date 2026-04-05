@@ -13,6 +13,7 @@ from analysis_engine import latest_customer_snapshot, load_prepared_data
 
 PAGE_TITLE = "Slampex Portfolio Risk & Growth Dashboard"
 DATA_PATH = Path(__file__).with_name("slampex_data_snapshot_tape.tsv")
+CACHE_VERSION = "2026-04-05-winsorized-contribution-v2"
 ACCENT_COLORS = {
     "primary": "#0f766e",
     "secondary": "#1d4ed8",
@@ -124,8 +125,26 @@ def configure_page() -> None:
 
 
 @st.cache_data(show_spinner=False)
-def get_dashboard_data(data_path: str | Path) -> pd.DataFrame:
+def get_dashboard_data(data_path: str | Path, cache_version: str) -> pd.DataFrame:
     return load_prepared_data(data_path)
+
+
+def ensure_display_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    data = frame.copy()
+    fallback_pairs = {
+        "observed_net_contribution_win": "observed_net_contribution",
+        "risk_adjusted_contribution_win": "risk_adjusted_contribution",
+        "stress_expected_loss_win": "stress_expected_loss",
+        "interchange_revenue_win": "interchange_revenue",
+        "rewards_cost_win": "rewards_cost",
+        "delinquent_balance_win": "delinquent_balance",
+        "rewardpoints_win": "rewardpoints",
+        "utilization_pct_win": "utilization_pct",
+    }
+    for target, source in fallback_pairs.items():
+        if target not in data.columns and source in data.columns:
+            data[target] = data[source]
+    return data
 
 
 def multiselect_with_all(label: str, options: list[str], key: str) -> list[str]:
@@ -964,7 +983,7 @@ def render_customer_drilldown_tab(frame: pd.DataFrame, selected_customer: str) -
 
 def main() -> None:
     configure_page()
-    frame = get_dashboard_data(DATA_PATH)
+    frame = ensure_display_columns(get_dashboard_data(DATA_PATH, CACHE_VERSION))
     st.markdown(
         """
         <div class="methodology-note">
