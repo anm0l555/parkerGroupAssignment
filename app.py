@@ -987,7 +987,7 @@ def main() -> None:
     st.markdown(
         """
         <div class="methodology-note">
-        The dashboard now adapts cleanly to light and dark mode, uses explicit aggregation rules by metric type,
+        The dashboard uses explicit aggregation rules by metric type,
         uses winsorized values for portfolio charts and summary economics except count-based composition views, keeps
         the raw monthly record table for auditability, and includes row-level explorers below charts so every visible
         segment can be traced back to the contributing records.
